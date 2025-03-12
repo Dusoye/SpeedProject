@@ -742,7 +742,7 @@ def main(gpx_files, google_maps_api_key=None, target_daily_distance=125):
     Returns:
     - Path to the generated HTML file
     """
-    google_maps_api_key = os.getenv("MAPS_API_KEY")
+    #google_maps_api_key = os.getenv("MAPS_API_KEY")
     route_data, html_file = process_gpx_files(gpx_files, google_maps_api_key, target_daily_distance)
     
     print(f"\nAnalysis complete!")
