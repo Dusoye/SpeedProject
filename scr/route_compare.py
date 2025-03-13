@@ -178,6 +178,50 @@ class GPXRouteAnalyzer:
         # Calculate overall route metrics
         self._calculate_route_metrics(route_name)
     
+    def _query_osm_surface(self, lat, lon, radius=100):
+        """
+        Query Overpass API to retrieve the surface tag for a given coordinate.
+        
+        Args:
+            lat (float): Latitude
+            lon (float): Longitude
+            radius (int): Search radius in meters (default 100)
+        
+        Returns:
+            str: Simplified surface type classification ('paved', 'dirt', or the raw surface value, or 'unknown')
+        """
+        url = "https://overpass-api.de/api/interpreter"
+        query = f"""
+        [out:json];
+        way(around:{radius}, {lat}, {lon})["surface"];
+        out tags;
+        """
+        try:
+            response = requests.get(url, data={'data': query})
+            data = response.json()
+            surfaces = []
+            for element in data.get('elements', []):
+                if 'tags' in element and 'surface' in element['tags']:
+                    surfaces.append(element['tags']['surface'])
+            if surfaces:
+                from collections import Counter
+                surface_counter = Counter(surfaces)
+                most_common_surface, _ = surface_counter.most_common(1)[0]
+                # Map common surface values to simplified classifications
+                #                
+                if most_common_surface in ['asphalt', 'concrete', 'paved', 'cobblestone']:
+                                       return 'paved'
+                elif most_common_surface in ['dirt', 'gravel', 'ground']:
+                    return 'dirt'
+                else:
+                    return most_common_surface
+            else:
+                return 'unknown'
+        except Exception as e:
+            #print(f\"Error querying Overpass API: {e}\")
+            return 'unknown'
+
+                
     def _fetch_terrain_data(self, route_name):
         """
         Fetch terrain data for a route using Google Maps API
@@ -198,42 +242,24 @@ class GPXRouteAnalyzer:
         for i, row in df.iterrows():
             current_dist = row['cumulative_distance']
             
-            # Only sample at specified intervals
+            # Sample at the specified intervals, or at the first/last point
             if current_dist - last_cumulative_dist >= sample_distance or i == 0 or i == len(df) - 1:
                 lat, lon = row['latitude'], row['longitude']
                 
-                # Get terrain type using Places API
-                url = f"https://maps.googleapis.com/maps/api/place/nearbysearch/json?location={lat},{lon}&radius=100&key={self.google_maps_api_key}"
+                # Query Overpass API to get surface data
+                terrain_type = self._query_osm_surface(lat, lon, radius=100)
+                terrain_types.add(terrain_type)
                 
-                try:
-                    response = requests.get(url)
-                    data = response.json()
-                    
-                    # Extract terrain types from the types of nearby places and features
-                    nearby_types = []
-                    if 'results' in data:
-                        for result in data['results']:
-                            if 'types' in result:
-                                nearby_types.extend(result['types'])
-                    
-                    # Classify terrain based on nearby features
-                    terrain_type = self._classify_terrain(nearby_types, lat, lon)
-                    terrain_types.add(terrain_type)
-                    
-                    terrain_data.append({
-                        'latitude': lat,
-                        'longitude': lon,
-                        'distance': current_dist,
-                        'terrain_type': terrain_type
-                    })
-                    
-                    last_cumulative_dist = current_dist
-                    
-                    # Respect API rate limits
-                    time.sleep(0.5)
-                    
-                except Exception as e:
-                    print(f"Error fetching terrain data: {e}")
+                terrain_data.append({
+                    'latitude': lat,
+                    'longitude': lon,
+                    'distance': current_dist,
+                    'terrain_type': terrain_type
+                })
+                
+                last_cumulative_dist = current_dist
+                # Pause to respect Overpass API rate limits
+                time.sleep(1)
         
         self.terrain_data[route_name] = pd.DataFrame(terrain_data)
         

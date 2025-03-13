@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GPX Route Analysis: LA to Vegas</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1, h2, h3 { color: #333; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .segment { margin-bottom: 30px; border: 1px solid #ddd; padding: 15px; }
+        .easy { background-color: #d4edda; }
+        .moderate { background-color: #fff3cd; }
+        .hard { background-color: #ffe5d0; }
+        .very-hard { background-color: #f8d7da; }
+        .terrain-summary { margin-top: 15px; margin-bottom: 15px; }
+        .terrain-chart { 
+            height: 25px; 
+            width: 100%; 
+            margin: 10px 0;
+            display: flex;
+        }
+        .terrain-bar {
+            height: 100%;
+            text-align: center;
+            color: white;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .terrain-bar span {
+            display: none;
+        }
+        .terrain-bar:hover span {
+            display: inline;
+        }
+        .asphalt { background-color: #4e4e4e; }
+        .paved { background-color: #6c757d; }
+        .concrete { background-color: #adb5bd; }
+        .compacted { background-color: #a98467; }
+        .dirt { background-color: #8b4513; }
+        .gravel { background-color: #b0a990; }
+        .unpaved { background-color: #b08968; }
+        .sand { background-color: #f5cb5c; }
+        .mud { background-color: #6f4e37; }
+        .unknown { background-color: #6c757d; }
+        .terrain-legend {
+            display: flex;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+            gap: 10px;
+        }
+        .terrain-legend-item {
+            display: flex;
+            align-items: center;
+            margin-right: 15px;
+        }
+        .terrain-legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 5px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <h1>LA to Vegas Route Analysis</h1>
+    <p>Analysis Date: 2025-03-13</p>
+
+    <!-- Terrain Legend -->
+    <h2>Terrain Types</h2>
+    <div class="terrain-legend">
+        <div class="terrain-legend-item">
+            <div class="terrain-legend-color asphalt"></div>
+            <span>Asphalt</span>
+        </div>
+        <div class="terrain-legend-item">
+            <div class="terrain-legend-color paved"></div>
+            <span>Paved</span>
+        </div>
+        <div class="terrain-legend-item">
+            <div class="terrain-legend-color concrete"></div>
+            <span>Concrete</span>
+        </div>
+        <div class="terrain-legend-item">
+            <div class="terrain-legend-color compacted"></div>
+            <span>Compacted</span>
+        </div>
+        <div class="terrain-legend-item">
+            <div class="terrain-legend-color dirt"></div>
+            <span>Dirt</span>
+        </div>
+        <div class="terrain-legend-item">
+            <div class="terrain-legend-color gravel"></div>
+            <span>Gravel</span>
+        </div>
+        <div class="terrain-legend-item">
+            <div class="terrain-legend-color unpaved"></div>
+            <span>Unpaved</span>
+        </div>
+        <div class="terrain-legend-item">
+            <div class="terrain-legend-color sand"></div>
+            <span>Sand</span>
+        </div>
+        <div class="terrain-legend-item">
+            <div class="terrain-legend-color mud"></div>
+            <span>Mud</span>
+        </div>
+        <div class="terrain-legend-item">
+            <div class="terrain-legend-color unknown"></div>
+            <span>Unknown</span>
+        </div>
+    </div>
+
+    <h2>Route Comparison</h2>
+    <table>
+        <tr>
+            <th>Route</th>
+            <th>Difficulty Score</th>
+            <th>Distance (km)</th>
+            <th>Elevation Gain (m)</th>
+            <th>Max Gradient (%)</th>
+            <th>Steep Sections</th>
+            <th>Road Surface</th>
+        </tr>
+    
+        <tr>
+            <td>Route B</td>
+            <td>79.5</td>
+            <td>474.8</td>
+            <td>4120</td>
+            <td>45.0</td>
+            <td>102.0</td>
+            <td>27.7% asphalt, 45.0% unknown, 10.3% compacted, 16.9% other</td>
+        </tr>
+        
+        <tr>
+            <td>OG</td>
+            <td>79.3</td>
+            <td>559.9</td>
+            <td>3947</td>
+            <td>24.4</td>
+            <td>154.0</td>
+            <td>27.5% asphalt, 64.5% unknown, 7.9% other</td>
+        </tr>
+        
+        <tr>
+            <td>Route A</td>
+            <td>77.9</td>
+            <td>476.3</td>
+            <td>3906</td>
+            <td>33.5</td>
+            <td>62.0</td>
+            <td>39.7% asphalt, 35.6% unknown, 10.0% compacted, 14.6% other</td>
+        </tr>
+    </table>
+
+    <!-- Route A -->
+    <h2>Segment Analysis: Route A</h2>
+    <div class="terrain-summary">
+        <h3>Overall Surface Distribution</h3>
+        <div class="terrain-chart">
+            <div class="terrain-bar asphalt" style="width: 39.7%"><span>Asphalt: 39.7%</span></div>
+            <div class="terrain-bar paved" style="width: 3.0%"><span>Paved: 3.0%</span></div>
+            <div class="terrain-bar unknown" style="width: 35.6%"><span>Unknown: 35.6%</span></div>
+            <div class="terrain-bar concrete" style="width: 1.3%"><span>Concrete: 1.3%</span></div>
+            <div class="terrain-bar unpaved" style="width: 1.8%"><span>Unpaved: 1.8%</span></div>
+            <div class="terrain-bar dirt" style="width: 5.8%"><span>Dirt: 5.8%</span></div>
+            <div class="terrain-bar gravel" style="width: 1.6%"><span>Gravel: 1.6%</span></div>
+            <div class="terrain-bar mud" style="width: 0.3%"><span>Mud: 0.3%</span></div>
+            <div class="terrain-bar sand" style="width: 0.9%"><span>Sand: 0.9%</span></div>
+            <div class="terrain-bar compacted" style="width: 10.0%"><span>Compacted: 10.0%</span></div>
+        </div>
+    </div>
+    
+    <div class="segment hard">
+        <h3>Segment 1.0: 0.0km to 125.0km (125.0km)</h3>
+        <p><strong>Difficulty:</strong> Hard (71.8/100)</p>
+        
+        <table>
+            <tr>
+                <th>Metric</th>
+                <th>Value</th>
+            </tr>
+            <tr>
+                <td>Elevation Gain</td>
+                <td>1123m</td>
+            </tr>
+            <tr>
+                <td>Elevation Loss</td>
+                <td>312m</td>
+            </tr>
+            <tr>
+                <td>Max Elevation</td>
+                <td>816m</td>
+            </tr>
+            <tr>
+                <td>Elevation Range</td>
+                <td>810m</td>
+            </tr>
+            <tr>
+                <td>Average Gradient</td>
+                <td>1.0%</td>
+            </tr>
+            <tr>
+                <td>Maximum Gradient</td>
+                <td>33.5%</td>
+            </tr>
+            <tr>
+                <td>Steep Sections</td>
+                <td>7.0</td>
+            </tr>
+        </table>
+        
+        <h4>Surface Distribution</h4>
+        <div class="terrain-chart">
+            <div class="terrain-bar asphalt" style="width: 57.1%"><span>Asphalt: 57.1%</span></div>
+            <div class="terrain-bar paved" style="width: 7.9%"><span>Paved: 7.9%</span></div>
+            <div class="terrain-bar unknown" style="width: 29.0%"><span>Unknown: 29.0%</span></div>
+            <div class="terrain-bar concrete" style="width: 4.8%"><span>Concrete: 4.8%</span></div>
+            <div class="terrain-bar unpaved" style="width: 0.7%"><span>Unpaved: 0.7%</span></div>
+            <div class="terrain-bar dirt" style="width: 0.4%"><span>Dirt: 0.4%</span></div>
+        </div>
+        
+        <h4>Key Challenges:</h4>
+        <ul>
+            <li>Significant climbing (1123m)</li>
+            <li>Steep sections (max 33.5%)</li>
+            <li>Good road surfaces (69.8% paved/asphalt/concrete)</li>
+        </ul>
+    </div>
+    
+    <div class="segment hard">
+        <h3>Segment 2.0: 125.0km to 250.0km (125.0km)</h3>
+        <p><strong>Difficulty:</strong> Hard (67.8/100)</p>
+        
+        <table>
+            <tr>
+                <th>Metric</th>
+                <th>Value</th>
+            </tr>
+            <tr>
+                <td>Elevation Gain</td>
+                <td>799m</td>
+            </tr>
+            <tr>
+                <td>Elevation Loss</td>
+                <td>1037m</td>
+            </tr>
+            <tr>
+                <td>Max Elevation</td>
+                <td>1281m</td>
+            </tr>
+            <tr>
+                <td>Elevation Range</td>
+                <td>700m</td>
+            </tr>
+            <tr>
+                <td>Average Gradient</td>
+                <td>-0.0%</td>
+            </tr>
+            <tr>
+                <td>Maximum Gradient</td>
+                <td>12.5%</td>
+            </tr>
+            <tr>
+                <td>Steep Sections</td>
+                <td>44.0</td>
+            </tr>
+        </table>
+        
+        <h4>Surface Distribution</h4>
+        <div class="terrain-chart">
+            <div class="terrain-bar asphalt" style="width: 50.4%"><span>Asphalt: 50.4%</span></div>
+            <div class="terrain-bar paved" style="width: 2.0%"><span>Paved: 2.0%</span></div>
+            <div class="terrain-bar unknown" style="width: 43.2%"><span>Unknown: 43.2%</span></div>
+            <div class="terrain-bar unpaved" style="width: 1.0%"><span>Unpaved: 1.0%</span></div>
+            <div class="terrain-bar dirt" style="width: 3.4%"><span>Dirt: 3.4%</span></div>
+        </div>
+        
+        <h4>Key Challenges:</h4>
+        <ul>
+            <li>Steep sections (max 12.5%)</li>
+            <li>Many steep sections (44.0 sections >8%)</li>
+            <li>Primarily paved surface (52.4% asphalt/paved)</li>
+        </ul>
+    </div>
+    
+    <div class="segment hard">
+        <h3>Segment 3.0: 250.0km to 375.0km (125.0km)</h3>
+        <p><strong>Difficulty:</strong> Hard (57.4/100)</p>
+        
+        <table>
+            <tr>
+                <th>Metric</th>
+                <th>Value</th>
+            </tr>
+            <tr>
+                <td>Elevation Gain</td>
+                <td>1317m</td>
+            </tr>
+            <tr>
+                <td>Elevation Loss</td>
+                <td>778m</td>
+            </tr>
+            <tr>
+                <td>Max Elevation</td>
+                <td>1255m</td>
+            </tr>
+            <tr>
+                <td>Elevation Range</td>
+                <td>974m</td>
+            </tr>
+            <tr>
+                <td>Average Gradient</td>
+                <td>0.5%</td>
+            </tr>
+            <tr>
+                <td>Maximum Gradient</td>
+                <td>7.5%</td>
+            </tr>
+            <tr>
+                <td>Steep Sections</td>
+                <td>0.0</td>
+            </tr>
+        </table>
+        
+        <h4>Surface Distribution</h4>
+        <div class="terrain-chart">
+            <div class="terrain-bar asphalt" style="width: 14.4%"><span>Asphalt: 14.4%</span></div>
+            <div class="terrain-bar unknown" style="width: 45.4%"><span>Unknown: 45.4%</span></div>
+            <div class="terrain-bar unpaved" style="width: 4.8%"><span>Unpaved: 4.8%</span></div>
+            <div class="terrain-bar gravel" style="width: 0.9%"><span>Gravel: 0.9%</span></div>
+            <div class="terrain-bar mud" style="width: 1.1%"><span>Mud: 1.1%</span></div>
+            <div class="terrain-bar sand" style="width: 3.2%"><span>Sand: 3.2%</span></div>
+            <div class="terrain-bar dirt" style="width: 13.8%"><span>Dirt: 13.8%</span></div>
+            <div class="terrain-bar compacted" style="width: 16.4%"><span>Compacted: 16.4%</span></div>
+        </div>
+        
+        <h4>Key Challenges:</h4>
+        <ul>
+            <li>Significant climbing (1317m)</li>
+            <li>Varied terrain (40.2% unpaved/dirt/gravel/sand/mud/compacted)</li>
+            <li>Limited paved sections (14.4% asphalt)</li>
+        </ul>
+    </div>
+    
+    <div class="segment hard">
+        <h3>Segment 4.0: 375.0km to 476.3km (101.3km)</h3>
+        <p><strong>Difficulty:</strong> Hard (58.8/100)</p>
+        
+        <table>
+            <tr>
+                <th>Metric</th>
+                <th>Value</th>
+            </tr>
+            <tr>
+                <td>Elevation Gain</td>
+                <td>667m</td>
+            </tr>
+            <tr>
+                <td>Elevation Loss</td>
+                <td>1122m</td>
+            </tr>
+            <tr>
+                <td>Max Elevation</td>
+                <td>1448m</td>
+            </tr>
+            <tr>
+                <td>Elevation Range</td>
+                <td>785m</td>
+            </tr>
+            <tr>
+                <td>Average Gradient</td>
+                <td>-0.5%</td>
+            </tr>
+            <tr>
+                <td>Maximum Gradient</td>
+                <td>18.8%</td>
+            </tr>
+            <tr>
+                <td>Steep Sections</td>
+                <td>11.0</td>
+            </tr>
+        </table>
+        
+        <h4>Surface Distribution</h4>
+        <div class="terrain-chart">
+            <div class="terrain-bar unknown" style="width: 20.0%"><span>Unknown: 20.0%</span></div>
+            <div class="terrain-bar compacted" style="width: 29.6%"><span>Compacted: 29.6%</span></div>
+            <div class="terrain-bar dirt" style="width: 5.6%"><span>Dirt: 5.6%</span></div>
+            <div class="terrain-bar gravel" style="width: 7.4%"><span>Gravel: 7.4%</span></div>
+            <div class="terrain-bar asphalt" style="width: 35.8%"><span>Asphalt: 35.8%</span></div>
+            <div class="terrain-bar paved" style="width: 1.6%"><span>Paved: 1.6%</span></div>
+        </div>
+        
+        <h4>Key Challenges:</h4>
+        <ul>
+            <li>Steep sections (max 18.8%)</li>
+            <li>Mix of paved and unpaved (37.4% asphalt/paved, 42.6% unpaved surfaces)</li>
+        </ul>
+    </div>
+
+    <!-- Route B -->
+    <h2>Segment Analysis: Route B</h2>
+    <div class="terrain-summary">
+        <h3>Overall Surface Distribution</h3>
+        <div class="terrain-chart">
+            <div class="terrain-bar asphalt" style="width: 27.7%"><span>Asphalt: 27.7%</span></div>
+            <div class="terrain-bar compacted" style="width: 10.3%"><span>Compacted: 10.3%</span></div>
+            <div class="terrain-bar unknown" style="width: 45.0%"><span>Unknown: 45.0%</span></div>
+            <div class="terrain-bar dirt" style="width: 5.5%"><span>Dirt: 5.5%</span></div>
+            <div class="terrain-bar concrete" style="width: 1.4%"><span>Concrete: 1.4%</span></div>
+            <div class="terrain-bar paved" style="width: 1.1%"><span>Paved: 1.1%</span></div>
+            <div class="terrain-bar unpaved" style="width: 5.9%"><span>Unpaved: 5.9%</span></div>
+            <div class="terrain-bar sand" style="width: 1.2%"><span>Sand: 1.2%</span></div>
+            <div class="terrain-bar gravel" style="width: 1.6%"><span>Gravel: 1.6%</span></div>
+            <div class="terrain-bar mud" style="width: 0.3%"><span>Mud: 0.3%</span></div>
+        </div>
+    </div>
+    
+    <div class="segment very-hard">
+        <h3>Segment 1.0: 0.0km to 125.0km (125.0km)</h3>
+        <p><strong>Difficulty:</strong> Very Hard (96.6/100)</p>
+        
+        <table>
+            <tr>
+                <th>Metric</th>
+                <th>Value</th>
+            </tr>
+            <tr>
+                <td>Elevation Gain</td>
+                <td>1805m</td>
+            </tr>
+            <tr>
+                <td>Elevation Loss</td>
+                <td>926m</td>
+            </tr>
+            <tr>
+                <td>Max Elevation</td>
+                <td>985m</td>
+            </tr>
+            <tr>
+                <td>Elevation Range</td>
+                <td>980m</td>
+            </tr>
+            <tr>
+                <td>Average Gradient</td>
+                <td>1.1%</td>
+            </tr>
+            <tr>
+                <td>Maximum Gradient</td>
+                <td>45.0%</td>
+            </tr>
+            <tr>
+                <td>Steep Sections</td>
+                <td>88.0</td>
+            </tr>
+        </table>
+        
+        <h4>Surface Distribution</h4>
+        <div class="terrain-chart">
+            <div class="terrain-bar asphalt" style="width: 19.4%"><span>Asphalt: 19.4%</span></div>
+            <div class="terrain-bar compacted" style="width: 1.0%"><span>Compacted: 1.0%</span></div>
+            <div class="terrain-bar unknown" style="width: 62.9%"><span>Unknown: 62.9%</span></div>
+            <div class="terrain-bar dirt" style="width: 1.5%"><span>Dirt: 1.5%</span></div>
+            <div class="terrain-bar concrete" style="width: 5.1%"><span>Concrete: 5.1%</span></div>
+            <div class="terrain-bar paved" style="width: 2.8%"><span>Paved: 2.8%</span></div>
+            <div class="terrain-bar unpaved" style="width: 7.3%"><span>Unpaved: 7.3%</span></div>
+        </div>
+        
+        <h4>Key Challenges:</h4>
+        <ul>
+            <li>Significant climbing (1805m)</li>
+            <li>Steep sections (max 45.0%)</li>
+            <li>Many steep sections (88.0 sections >8%)</li>
+            <li>Mixed surfaces (27.3% paved/asphalt/concrete, 9.8% unpaved/dirt)</li>
+        </ul>
+    </div>
+    
+    <div class="segment moderate">
+        <h3>Segment 2.0: 125.0km to 250.0km (125.0km)</h3>
+        <p><strong>Difficulty:</strong> Moderate (42.4/100)</p>
+        
+        <table>
+            <tr>
+                <th>Metric</th>
+                <th>Value</th>
+            </tr>
+            <tr>
+                <td>Elevation Gain</td>
+                <td>329m</td>
+            </tr>
+            <tr>
+                <td>Elevation Loss</td>
+                <td>643m</td>
+            </tr>
+            <tr>
+                <td>Max Elevation</td>
+                <td>905m</td>
+            </tr>
+            <tr>
+                <td>Elevation Range</td>
+                <td>334m</td>
+            </tr>
+            <tr>
+                <td>Average Gradient</td>
+                <td>-0.3%</td>
+            </tr>
+            <tr>
+                <td>Maximum Gradient</td>
+                <td>8.6%</td>
+            </tr>
+            <tr>
+                <td>Steep Sections</td>
+                <td>3.0</td>
+            </tr>
+        </table>
+        
+        <h4>Surface Distribution</h4>
+        <div class="terrain-chart">
+            <div class="terrain-bar unpaved" style="width: 14.2%"><span>Unpaved: 14.2%</span></div>
+            <div class="terrain-bar unknown" style="width: 43.4%"><span>Unknown: 43.4%</span></div>
+            <div class="terrain-bar asphalt" style="width: 42.4%"><span>Asphalt: 42.4%</span></div>
+        </div>
+        
+        <h4>Key Challenges:</h4>
+        <ul>
+            <li>Unpaved sections (14.2% unpaved)</li>
+            <li>High percentage of unknown terrain (43.4%)</li>
+        </ul>
+    </div>
+    
+    <div class="segment hard">
+        <h3>Segment 3.0: 250.0km to 375.0km (125.0km)</h3>
+        <p><strong>Difficulty:</strong> Hard (57.5/100)</p>
+        
+        <table>
+            <tr>
+                <th>Metric</th>
+                <th>Value</th>
+            </tr>
+            <tr>
+                <td>Elevation Gain</td>
+                <td>1320m</td>
+            </tr>
+            <tr>
+                <td>Elevation Loss</td>
+                <td>774m</td>
+            </tr>
+            <tr>
+                <td>Max Elevation</td>
+                <td>1255m</td>
+            </tr>
+            <tr>
+                <td>Elevation Range</td>
+                <td>974m</td>
+            </tr>
+            <tr>
+                <td>Average Gradient</td>
+                <td>0.5%</td>
+            </tr>
+            <tr>
+                <td>Maximum Gradient</td>
+                <td>7.5%</td>
+            </tr>
+            <tr>
+                <td>Steep Sections</td>
+                <td>0.0</td>
+            </tr>
+        </table>
+        
+        <h4>Surface Distribution</h4>
+        <div class="terrain-chart">
+            <div class="terrain-bar unknown" style="width: 45.6%"><span>Unknown: 45.6%</span></div>
+            <div class="terrain-bar sand" style="width: 4.3%"><span>Sand: 4.3%</span></div>
+            <div class="terrain-bar asphalt" style="width: 14.0%"><span>Asphalt: 14.0%</span></div>
+            <div class="terrain-bar gravel" style="width: 0.8%"><span>Gravel: 0.8%</span></div>
+            <div class="terrain-bar mud" style="width: 1.1%"><span>Mud: 1.1%</span></div>
+            <div class="terrain-bar dirt" style="width: 14.8%"><span>Dirt: 14.8%</span></div>
+            <div class="terrain-bar compacted" style="width: 19.4%"><span>Compacted: 19.4%</span></div>
+        </div>
+        
+        <h4>Key Challenges:</h4>
+        <ul>
+            <li>Significant climbing (1320m)</li>
+            <li>Predominantly off-road (40.4% dirt/sand/gravel/mud/compacted)</li>
+            <li>Limited paved sections (14.0% asphalt)</li>
+        </ul>
+    </div>
+    
+    <div class="segment hard">
+        <h3>Segment 4.0: 375.0km to 474.8km (99.8km)</h3>
+        <p><strong>Difficulty:</strong> Hard (58.4/100)</p>
+        
+        <table>
+            <tr>
+                <th>Metric</th>
+                <th>Value</th>
+            </tr>
+            <tr>
+                <td>Elevation Gain</td>
+                <td>665m</td>
+            </tr>
+            <tr>
+                <td>Elevation Loss</td>
+                <td>1119m</td>
+            </tr>
+            <tr>
+                <td>Max Elevation</td>
+                <td>1448m</td>
+            </tr>
+            <tr>
+                <td>Elevation Range</td>
+                <td>785m</td>
+            </tr>
+            <tr>
+                <td>Average Gradient</td>
+                <td>-0.5%</td>
+            </tr>
+            <tr>
+                <td>Maximum Gradient</td>
+                <td>18.8%</td>
+            </tr>
+            <tr>
+                <td>Steep Sections</td>
+                <td>11.0</td>
+            </tr>
+        </table>
+        
+        <h4>Surface Distribution</h4>
+        <div class="terrain-chart">
+            <div class="terrain-bar compacted" style="width: 26.5%"><span>Compacted: 26.5%</span></div>
+            <div class="terrain-bar dirt" style="width: 5.9%"><span>Dirt: 5.9%</span></div>
+            <div class="terrain-bar unknown" style="width: 19.2%"><span>Unknown: 19.2%</span></div>
+            <div class="terrain-bar gravel" style="width: 7.7%"><span>Gravel: 7.7%</span></div>
+            <div class="terrain-bar asphalt" style="width: 39.0%"><span>Asphalt: 39.0%</span></div>
+            <div class="terrain-bar paved" style="width: 1.7%"><span>Paved: 1.7%</span></div>
+        </div>
+        
+        <h4>Key Challenges:</h4>
+        <ul>
+            <li>Steep sections (max 18.8%)</li>
+            <li>Mix of paved and unpaved surfaces (40.7% asphalt/paved, 40.1% unpaved/dirt/gravel/compacted)</li>
+        </ul>
+    </div>
+    
+    <!-- OG Route -->
+    <h2>Segment Analysis: OG</h2>
+    <div class="terrain-summary">
+        <h3>Overall Surface Distribution</h3>
+        <div class="terrain-chart">
+            <div class="terrain-bar asphalt" style="width: 27.5%"><span>Asphalt: 27.5%</span></div>
+            <div class="terrain-bar concrete" style="width: 0.6%"><span>Concrete: 0.6%</span></div>
+            <div class="terrain-bar paved" style="width: 1.0%"><span>Paved: 1.0%</span></div>
+            <div class="terrain-bar unknown" style="width: 64.5%"><span>Unknown: 64.5%</span></div>
+            <div class="terrain-bar unpaved" style="width: 6.1%"><span>Unpaved: 6.1%</span></div>
+            <div class="terrain-bar dirt" style="width: 0.3%"><span>Dirt: 0.3%</span></div>
+        </div>
+    </div>
+    
+    <div class="segment very-hard">
+        <h3>Segment 1.0: 0.0km to 125.0km (125.0km)</h3>
+        <p><strong>Difficulty:</strong> Very Hard (91.6/100)</p>
+        
+        <table>
+            <tr>
+                <th>Metric</th>
+                <th>Value</th>
+            </tr>
+            <tr>
+                <td>Elevation Gain</td>
+                <td>1522m</td>
+            </tr>
+            <tr>
+                <td>Elevation Loss</td>
+                <td>689m</td>
+            </tr>
+            <tr>
+                <td>Max Elevation</td>
+                <td>986m</td>
+            </tr>
+            <tr>
+                <td>Elevation Range</td>
+                <td>967m</td>
+            </tr>
+            <tr>
+                <td>Average Gradient</td>
+                <td>1.6%</td>
+            </tr>
+            <tr>
+                <td>Maximum Gradient</td>
+                <td>24.4%</td>
+            </tr>
+            <tr>
+                <td>Steep Sections</td>
+                <td>75.0</td>
+            </tr>
+        </table>
+        
+        <h4>Surface Distribution</h4>
+        <div class="terrain-chart">
+            <div class="terrain-bar asphalt" style="width: 33.6%"><span>Asphalt: 33.6%</span></div>
+            <div class="terrain-bar concrete" style="width: 2.8%"><span>Concrete: 2.8%</span></div>
+            <div class="terrain-bar paved" style="width: 4.2%"><span>Paved: 4.2%</span></div>
+            <div class="terrain-bar unknown" style="width: 56.4%"><span>Unknown: 56.4%</span></div>
+            <div class="terrain-bar unpaved" style="width: 2.0%"><span>Unpaved: 2.0%</span></div>
+            <div class="terrain-bar dirt" style="width: 1.1%"><span>Dirt: 1.1%</span></div>
+        </div>
+        
+        <h4>Key Challenges:</h4>
+        <ul>
+            <li>Significant climbing (1522m)</li>
+            <li>Steep sections (max 24.4%)</li>
+            <li>Many steep sections (75.0 sections >8%)</li>
+            <li>Predominantly paved with some unknown sections (40.6% asphalt/concrete/paved)</li>
+        </ul>
+    </div>
+    
+    <div class="segment moderate">
+        <h3>Segment 2.0: 125.0km to 250.0km (125.0km)</h3>
+        <p><strong>Difficulty:</strong> Moderate (43.3/100)</p>
+        
+        <table>
+            <tr>
+                <th>Metric</th>
+                <th>Value</th>
+            </tr>
+            <tr>
+                <td>Elevation Gain</td>
+                <td>209m</td>
+            </tr>
+            <tr>
+                <td>Elevation Loss</td>
+                <td>418m</td>
+            </tr>
+            <tr>
+                <td>Max Elevation</td>
+                <td>893m</td>
+            </tr>
+            <tr>
+                <td>Elevation Range</td>
+                <td>254m</td>
+            </tr>
+            <tr>
+                <td>Average Gradient</td>
+                <td>-0.0%</td>
+            </tr>
+            <tr>
+                <td>Maximum Gradient</td>
+                <td>9.8%</td>
+            </tr>
+            <tr>
+                <td>Steep Sections</td>
+                <td>8.0</td>
+            </tr>
+        </table>
+        
+        <h4>Surface Distribution</h4>
+        <div class="terrain-chart">
+            <div class="terrain-bar unknown" style="width: 65.5%"><span>Unknown: 65.5%</span></div>
+            <div class="terrain-bar asphalt" style="width: 19.3%"><span>Asphalt: 19.3%</span></div>
+            <div class="terrain-bar unpaved" style="width: 15.2%"><span>Unpaved: 15.2%</span></div>
+        </div>
+        
+        <h4>Key Challenges:</h4>
+        <ul>
+            <li>High percentage of unknown terrain (65.5%)</li>
+            <li>Significant unpaved sections (15.2%)</li>
+        </ul>
+    </div>
+    
+    <div class="segment moderate">
+        <h3>Segment 3.0: 250.0km to 375.0km (125.0km)</h3>
+        <p><strong>Difficulty:</strong> Moderate (42.2/100)</p>
+        
+        <table>
+            <tr>
+                <th>Metric</th>
+                <th>Value</th>
+            </tr>
+            <tr>
+                <td>Elevation Gain</td>
+                <td>317m</td>
+            </tr>
+            <tr>
+                <td>Elevation Loss</td>
+                <td>693m</td>
+            </tr>
+            <tr>
+                <td>Max Elevation</td>
+                <td>689m</td>
+            </tr>
+            <tr>
+                <td>Elevation Range</td>
+                <td>415m</td>
+            </tr>
+            <tr>
+                <td>Average Gradient</td>
+                <td>-1.0%</td>
+            </tr>
+            <tr>
+                <td>Maximum Gradient</td>
+                <td>8.8%</td>
+            </tr>
+            <tr>
+                <td>Steep Sections</td>
+                <td>2.0</td>
+            </tr>
+        </table>
+        
+        <h4>Surface Distribution</h4>
+        <div class="terrain-chart">
+            <div class="terrain-bar unknown" style="width: 83.2%"><span>Unknown: 83.2%</span></div>
+            <div class="terrain-bar asphalt" style="width: 16.8%"><span>Asphalt: 16.8%</span></div>
+        </div>
+        
+        <h4>Key Challenges:</h4>
+        <ul>
+            <li>Very high percentage of unknown terrain (83.2%)</li>
+            <li>Limited known paved sections (16.8% asphalt)</li>
+        </ul>
+    </div>
+    
+    <div class="segment very-hard">
+        <h3>Segment 4.0: 375.0km to 500.0km (125.0km)</h3>
+        <p><strong>Difficulty:</strong> Very Hard (81.6/100)</p>
+        
+        <table>
+            <tr>
+                <th>Metric</th>
+                <th>Value</th>
+            </tr>
+            <tr>
+                <td>Elevation Gain</td>
+                <td>1287m</td>
+            </tr>
+            <tr>
+                <td>Elevation Loss</td>
+                <td>491m</td>
+            </tr>
+            <tr>
+                <td>Max Elevation</td>
+                <td>1041m</td>
+            </tr>
+            <tr>
+                <td>Elevation Range</td>
+                <td>898m</td>
+            </tr>
+            <tr>
+                <td>Average Gradient</td>
+                <td>1.4%</td>
+            </tr>
+            <tr>
+                <td>Maximum Gradient</td>
+                <td>15.3%</td>
+            </tr>
+            <tr>
+                <td>Steep Sections</td>
+                <td>54.0</td>
+            </tr>
+        </table>
+        
+        <h4>Surface Distribution</h4>
+        <div class="terrain-chart">
+            <div class="terrain-bar unknown" style="width: 57.6%"><span>Unknown: 57.6%</span></div>
+            <div class="terrain-bar asphalt" style="width: 36.4%"><span>Asphalt: 36.4%</span></div>
+            <div class="terrain-bar unpaved" style="width: 6.0%"><span>Unpaved: 6.0%</span></div>
+        </div>
+        
+        <h4>Key Challenges:</h4>
+        <ul>
+            <li>Significant climbing (1287m)</li>
+            <li>Steep sections (max 15.3%)</li>
+            <li>Many steep sections (54.0 sections >8%)</li>
+            <li>Mixed surfaces (36.4% asphalt, 57.6% unknown)</li>
+        </ul>
+    </div>
+    
+    <div class="segment moderate">
+        <h3>Segment 5.0: 500.0km to 559.9km (59.9km)</h3>
+        <p><strong>Difficulty:</strong> Moderate (45.0/100)</p>
+        
+        <table>
+            <tr>
+                <th>Metric</th>
+                <th>Value</th>
+            </tr>
+            <tr>
+                <td>Elevation Gain</td>
+                <td>612m</td>
+            </tr>
+            <tr>
+                <td>Elevation Loss</td>
+                <td>1011m</td>
+            </tr>
+            <tr>
+                <td>Max Elevation</td>
+                <td>1673m</td>
+            </tr>
+            <tr>
+                <td>Elevation Range</td>
+                <td>1010m</td>
+            </tr>
+            <tr>
+                <td>Average Gradient</td>
+                <td>-2.8%</td>
+            </tr>
+            <tr>
+                <td>Maximum Gradient</td>
+                <td>14.2%</td>
+            </tr>
+            <tr>
+                <td>Steep Sections</td>
+                <td>15.0</td>
+            </tr>
+        </table>
+        
+        <h4>Surface Distribution</h4>
+        <div class="terrain-chart">
+            <div class="terrain-bar unpaved" style="width: 10.2%"><span>Unpaved: 10.2%</span></div>
+            <div class="terrain-bar unknown" style="width: 47.2%"><span>Unknown: 47.2%</span></div>
+            <div class="terrain-bar asphalt" style="width: 42.6%"><span>Asphalt: 42.6%</span></div>
+        </div>
+        
+        <h4>Key Challenges:</h4>
+        <ul>
+            <li>Steep sections (max 14.2%)</li>
+            <li>Mixed surfaces (42.6% asphalt, 10.2% unpaved)</li>
+        </ul>
+    </div>
+</body>
+</html>
