@@ -1,0 +1,1423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPX Route Amenities Explorer</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            right: 0;
+            width: 75%;
+            height: 100%;
+        }
+        #sidebar {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            width: 25%;
+            height: 100%;
+            background: #f8f9fa;
+            padding: 10px;
+            overflow-y: auto;
+            box-sizing: border-box;
+        }
+        .info-box {
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+            margin-bottom: 15px;
+        }
+        h2, h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .control-section {
+            margin-bottom: 20px;
+        }
+        .amenity-group {
+            margin-bottom: 15px;
+        }
+        .amenity-header {
+            font-weight: bold;
+            margin-bottom: 5px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .amenity-items {
+            margin-left: 10px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        .amenity-items.expanded {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .amenity-checkbox {
+            margin-right: 5px;
+        }
+        .route-info {
+            margin-bottom: 15px;
+        }
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            text-align: center;
+        }
+        .loading-text {
+            display: block;
+            margin-top: 10px;
+        }
+        .amenity-count {
+            background: #e9ecef;
+            border-radius: 10px;
+            padding: 2px 6px;
+            font-size: 12px;
+            margin-left: 5px;
+        }
+        .legend {
+            padding: 6px 8px;
+            background: white;
+            background: rgba(255,255,255,0.8);
+            border-radius: 5px;
+            line-height: 24px;
+            color: #555;
+        }
+        .legend i {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.7;
+        }
+        .legend .gradient-line {
+            height: 4px;
+            margin-top: 7px;
+        }
+        .slider-container {
+            margin: 10px 0;
+        }
+        #buffer-slider {
+            width: 100%;
+        }
+        #buffer-value {
+            display: inline-block;
+            width: 40px;
+            text-align: right;
+        }
+        .toggle-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin: 5px 0;
+        }
+        .toggle-btn:hover {
+            background: #0069d9;
+        }
+        .button-group {
+            display: flex;
+            gap: 5px;
+            margin: 10px 0;
+        }
+        #route-segments-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        #route-segments-list li {
+            padding: 5px;
+            margin-bottom: 5px;
+            background: #e9ecef;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        #route-segments-list li.active {
+            background: #007bff;
+            color: white;
+        }
+        .segment-chart {
+            height: 100px;
+            width: 100%;
+            background: #f8f9fa;
+            margin: 10px 0;
+            position: relative;
+            border: 1px solid #ddd;
+        }
+        .tooltip {
+            position: absolute;
+            display: none;
+            background: white;
+            border: 1px solid #ddd;
+            padding: 5px;
+            border-radius: 3px;
+            z-index: 1000;
+        }
+        .gpx-file-selection {
+            margin-bottom: 15px;
+        }
+        #gpx-file-select {
+            width: 100%;
+            padding: 5px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <div class="info-box">
+            <h2>Route Explorer</h2>
+            <p>Explore route with amenities, surface data, and gradients.</p>
+            
+            <div class="gpx-file-selection">
+                <label for="gpx-file-select">Select GPX File:</label>
+                <select id="gpx-file-select">
+                    <option value="">Loading files...</option>
+                </select>
+            </div>
+            
+            <div class="slider-container">
+                <label for="buffer-slider">Search radius: <span id="buffer-value">200</span>m</label>
+                <input type="range" id="buffer-slider" min="50" max="1000" value="200" step="50">
+            </div>
+
+            <div class="button-group">
+                <button id="load-amenities-btn" class="toggle-btn">Load Amenities</button>
+                <button id="clear-amenities-btn" class="toggle-btn">Clear All</button>
+            </div>
+            
+            <div class="control-section">
+                <h3>Route Information</h3>
+                <div id="route-info" class="route-info">
+                    Select a GPX file to view route data...
+                </div>
+                
+                <h3>Route Segments</h3>
+                <ul id="route-segments-list"></ul>
+            </div>
+
+            <div class="control-section">
+                <h3>Segment Profile</h3>
+                <div id="segment-profile" class="segment-chart"></div>
+                <div id="tooltip" class="tooltip"></div>
+            </div>
+            
+            <div class="control-section">
+                <h3>Amenities</h3>
+                <div id="amenities-container">
+                    <!-- Food & Drink -->
+                    <div class="amenity-group">
+                        <div class="amenity-header" data-group="food_drink">
+                            <span>Food & Drink</span>
+                            <span class="amenity-count" id="count-food_drink">0</span>
+                        </div>
+                        <div class="amenity-items" id="food_drink">
+                            <div>
+                                <input type="checkbox" id="restaurant" class="amenity-checkbox" data-type="restaurant">
+                                <label for="restaurant">Restaurants</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="cafe" class="amenity-checkbox" data-type="cafe">
+                                <label for="cafe">Cafes</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="fast_food" class="amenity-checkbox" data-type="fast_food">
+                                <label for="fast_food">Fast Food</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="supermarket" class="amenity-checkbox" data-type="supermarket">
+                                <label for="supermarket">Supermarkets</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="convenience" class="amenity-checkbox" data-type="convenience">
+                                <label for="convenience">Convenience Stores</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="bakery" class="amenity-checkbox" data-type="bakery">
+                                <label for="bakery">Bakeries</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Water & Rest -->
+                    <div class="amenity-group">
+                        <div class="amenity-header" data-group="water_rest">
+                            <span>Water & Rest</span>
+                            <span class="amenity-count" id="count-water_rest">0</span>
+                        </div>
+                        <div class="amenity-items" id="water_rest">
+                            <div>
+                                <input type="checkbox" id="water_point" class="amenity-checkbox" data-type="drinking_water|water_point">
+                                <label for="water_point">Water Points</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="toilets" class="amenity-checkbox" data-type="toilets">
+                                <label for="toilets">Toilets</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="shower" class="amenity-checkbox" data-type="shower">
+                                <label for="shower">Showers</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="bench" class="amenity-checkbox" data-type="bench">
+                                <label for="bench">Benches</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="shelter" class="amenity-checkbox" data-type="shelter">
+                                <label for="shelter">Shelters</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="picnic_site" class="amenity-checkbox" data-type="picnic_site">
+                                <label for="picnic_site">Picnic Sites</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Accommodation -->
+                    <div class="amenity-group">
+                        <div class="amenity-header" data-group="accommodation">
+                            <span>Accommodation</span>
+                            <span class="amenity-count" id="count-accommodation">0</span>
+                        </div>
+                        <div class="amenity-items" id="accommodation">
+                            <div>
+                                <input type="checkbox" id="hotel" class="amenity-checkbox" data-type="hotel">
+                                <label for="hotel">Hotels</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="hostel" class="amenity-checkbox" data-type="hostel">
+                                <label for="hostel">Hostels</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="guest_house" class="amenity-checkbox" data-type="guest_house">
+                                <label for="guest_house">Guest Houses</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="motel" class="amenity-checkbox" data-type="motel">
+                                <label for="motel">Motels</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="camp_site" class="amenity-checkbox" data-type="camp_site">
+                                <label for="camp_site">Camp Sites</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="caravan_site" class="amenity-checkbox" data-type="caravan_site">
+                                <label for="caravan_site">Caravan Sites</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Vehicle Support -->
+                    <div class="amenity-group">
+                        <div class="amenity-header" data-group="vehicle_support">
+                            <span>Vehicle Support</span>
+                            <span class="amenity-count" id="count-vehicle_support">0</span>
+                        </div>
+                        <div class="amenity-items" id="vehicle_support">
+                            <div>
+                                <input type="checkbox" id="fuel" class="amenity-checkbox" data-type="fuel">
+                                <label for="fuel">Fuel Stations</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="parking" class="amenity-checkbox" data-type="parking">
+                                <label for="parking">Parking</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="car_wash" class="amenity-checkbox" data-type="car_wash">
+                                <label for="car_wash">Car Wash</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="car_repair" class="amenity-checkbox" data-type="car_repair">
+                                <label for="car_repair">Car Repair</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="charging_station" class="amenity-checkbox" data-type="charging_station">
+                                <label for="charging_station">Charging Stations</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Medical -->
+                    <div class="amenity-group">
+                        <div class="amenity-header" data-group="medical">
+                            <span>Medical</span>
+                            <span class="amenity-count" id="count-medical">0</span>
+                        </div>
+                        <div class="amenity-items" id="medical">
+                            <div>
+                                <input type="checkbox" id="hospital" class="amenity-checkbox" data-type="hospital">
+                                <label for="hospital">Hospitals</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="doctors" class="amenity-checkbox" data-type="doctors">
+                                <label for="doctors">Doctors</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="pharmacy" class="amenity-checkbox" data-type="pharmacy">
+                                <label for="pharmacy">Pharmacies</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="first_aid" class="amenity-checkbox" data-type="first_aid|emergency_point">
+                                <label for="first_aid">First Aid Points</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Emergency -->
+                    <div class="amenity-group">
+                        <div class="amenity-header" data-group="emergency">
+                            <span>Emergency</span>
+                            <span class="amenity-count" id="count-emergency">0</span>
+                        </div>
+                        <div class="amenity-items" id="emergency">
+                            <div>
+                                <input type="checkbox" id="police" class="amenity-checkbox" data-type="police">
+                                <label for="police">Police Stations</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="fire_station" class="amenity-checkbox" data-type="fire_station">
+                                <label for="fire_station">Fire Stations</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="mountain_rescue" class="amenity-checkbox" data-type="mountain_rescue|ranger_station">
+                                <label for="mountain_rescue">Mountain Rescue</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="telephone" class="amenity-checkbox" data-type="telephone">
+                                <label for="telephone">Telephones</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Supplies -->
+                    <div class="amenity-group">
+                        <div class="amenity-header" data-group="supplies">
+                            <span>Supplies</span>
+                            <span class="amenity-count" id="count-supplies">0</span>
+                        </div>
+                        <div class="amenity-items" id="supplies">
+                            <div>
+                                <input type="checkbox" id="sports" class="amenity-checkbox" data-type="sports">
+                                <label for="sports">Sports Shops</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="outdoor" class="amenity-checkbox" data-type="outdoor">
+                                <label for="outdoor">Outdoor Shops</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="atm" class="amenity-checkbox" data-type="atm">
+                                <label for="atm">ATMs</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="bank" class="amenity-checkbox" data-type="bank">
+                                <label for="bank">Banks</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="laundry" class="amenity-checkbox" data-type="laundry">
+                                <label for="laundry">Laundry</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="map"></div>
+    <div id="loading" class="loading" style="display: none;">
+        <i class="fas fa-spinner fa-spin fa-3x"></i>
+        <span class="loading-text">Loading data...</span>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script>
+        // Main application state
+        const state = {
+            routeData: null,
+            routeLayer: null,
+            segmentLayers: [],
+            currentSegment: null,
+            amenityLayers: {},
+            bufferDistance: 200, // meters
+            overpassTimeoutSeconds: 180,
+            loadingAmenities: false,
+            amenityCounts: {}
+        };
+
+        // Define amenity groups and their icon/color mapping
+        const amenityGroups = {
+            food_drink: {
+                restaurant: { icon: 'fa-utensils', color: '#FF5733' },
+                cafe: { icon: 'fa-coffee', color: '#C70039' },
+                fast_food: { icon: 'fa-hamburger', color: '#FFC300' },
+                supermarket: { icon: 'fa-shopping-cart', color: '#16A085' },
+                convenience: { icon: 'fa-store', color: '#D35400' },
+                bakery: { icon: 'fa-bread-slice', color: '#D2691E' }
+            },
+            water_rest: {
+                'drinking_water|water_point': { icon: 'fa-tint', color: '#33A1FF' },
+                toilets: { icon: 'fa-toilet', color: '#DAF7A6' },
+                shower: { icon: 'fa-shower', color: '#AED6F1' },
+                bench: { icon: 'fa-chair', color: '#A0522D' },
+                shelter: { icon: 'fa-umbrella', color: '#7D3C98' },
+                picnic_site: { icon: 'fa-utensils', color: '#117A65' }
+            },
+            accommodation: {
+                hotel: { icon: 'fa-hotel', color: '#3498DB' },
+                hostel: { icon: 'fa-bed', color: '#2980B9' },
+                guest_house: { icon: 'fa-house-user', color: '#1ABC9C' },
+                motel: { icon: 'fa-concierge-bell', color: '#F1C40F' },
+                camp_site: { icon: 'fa-campground', color: '#27AE60' },
+                caravan_site: { icon: 'fa-caravan', color: '#117A65' }
+            },
+            vehicle_support: {
+                fuel: { icon: 'fa-gas-pump', color: '#E74C3C' },
+                parking: { icon: 'fa-parking', color: '#7F8C8D' },
+                car_wash: { icon: 'fa-shower', color: '#5D6D7E' },
+                car_repair: { icon: 'fa-wrench', color: '#34495E' },
+                charging_station: { icon: 'fa-charging-station', color: '#2ECC71' }
+            },
+            medical: {
+                hospital: { icon: 'fa-hospital', color: '#C0392B' },
+                doctors: { icon: 'fa-user-md', color: '#E67E22' },
+                pharmacy: { icon: 'fa-prescription-bottle-alt', color: '#27AE60' },
+                'first_aid|emergency_point': { icon: 'fa-first-aid', color: '#A93226' }
+            },
+            emergency: {
+                police: { icon: 'fa-shield-alt', color: '#2C3E50' },
+                fire_station: { icon: 'fa-fire-extinguisher', color: '#C0392B' },
+                'mountain_rescue|ranger_station': { icon: 'fa-mountain', color: '#A93226' },
+                telephone: { icon: 'fa-phone', color: '#1F618D' }
+            },
+            supplies: {
+                sports: { icon: 'fa-running', color: '#1ABC9C' },
+                outdoor: { icon: 'fa-hiking', color: '#196F3D' },
+                atm: { icon: 'fa-money-bill-wave', color: '#F1C40F' },
+                bank: { icon: 'fa-university', color: '#F39C12' },
+                laundry: { icon: 'fa-tshirt', color: '#3498DB' }
+            }
+        };
+
+        // Surface type colors
+        const surfaceColors = {
+            asphalt: '#333333',
+            paved: '#666666',
+            concrete: '#999999',
+            unpaved: '#A98467',
+            dirt: '#8B4513',
+            gravel: '#B0A990',
+            sand: '#F5CB5C',
+            mud: '#6F4E37',
+            compacted: '#A98467',
+            unknown: '#AAAAAA'
+        };
+
+        // Gradient colors
+        const gradientColors = [
+            { threshold: -15, color: '#1A237E' }, // Very steep downhill
+            { threshold: -8, color: '#1976D2' },  // Steep downhill
+            { threshold: -4, color: '#4FC3F7' },  // Moderate downhill
+            { threshold: -2, color: '#B3E5FC' },  // Gentle downhill
+            { threshold: 2, color: '#E8F5E9' },   // Flat/minimal
+            { threshold: 4, color: '#A5D6A7' },   // Gentle uphill
+            { threshold: 8, color: '#4CAF50' },   // Moderate uphill
+            { threshold: 15, color: '#FFA000' },  // Steep uphill
+            { threshold: Infinity, color: '#D32F2F' } // Very steep uphill
+        ];
+
+        // Initialize the map
+        const map = L.map('map').setView([0, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Add Legends
+        function addLegends() {
+            // Gradient legend
+            const gradientLegend = L.control({ position: 'bottomright' });
+            gradientLegend.onAdd = function() {
+                const div = L.DomUtil.create('div', 'legend');
+                div.innerHTML = '<h4>Gradient</h4>';
+                
+                // Add gradient colors
+                for (let i = gradientColors.length - 1; i >= 0; i--) {
+                    const color = gradientColors[i];
+                    const prevThreshold = i > 0 ? gradientColors[i - 1].threshold : -Infinity;
+                    let label;
+                    
+                    if (color.threshold === Infinity) {
+                        label = `> ${gradientColors[i - 1].threshold}%`;
+                    } else if (prevThreshold === -Infinity) {
+                        label = `< ${color.threshold}%`;
+                    } else {
+                        label = `${prevThreshold}% to ${color.threshold}%`;
+                    }
+                    
+                    div.innerHTML += `
+                        <div>
+                            <i class="gradient-line" style="background:${color.color}"></i>
+                            ${label}
+                        </div>
+                    `;
+                }
+                return div;
+            };
+            gradientLegend.addTo(map);
+            
+            // Surface legend
+            const surfaceLegend = L.control({ position: 'bottomleft' });
+            surfaceLegend.onAdd = function() {
+                const div = L.DomUtil.create('div', 'legend');
+                div.innerHTML = '<h4>Surface Type</h4>';
+                
+                // Add surface colors
+                Object.entries(surfaceColors).forEach(([type, color]) => {
+                    div.innerHTML += `
+                        <div>
+                            <i style="background:${color}"></i>
+                            ${type.charAt(0).toUpperCase() + type.slice(1)}
+                        </div>
+                    `;
+                });
+                return div;
+            };
+            surfaceLegend.addTo(map);
+        }
+
+        // Initialize event listeners
+        function initEventListeners() {
+            // GPX file selection
+            document.getElementById('gpx-file-select').addEventListener('change', function(e) {
+                const selectedFile = e.target.value;
+                if (selectedFile) {
+                    loadGPXFile(selectedFile);
+                }
+            });
+            
+            // Buffer distance slider
+            document.getElementById('buffer-slider').addEventListener('input', function(e) {
+                state.bufferDistance = parseInt(e.target.value);
+                document.getElementById('buffer-value').textContent = state.bufferDistance;
+            });
+            
+            // Load amenities button
+            document.getElementById('load-amenities-btn').addEventListener('click', function() {
+                const selectedTypes = getSelectedAmenityTypes();
+                if (selectedTypes.length > 0) {
+                    loadAmenities(selectedTypes);
+                } else {
+                    alert('Please select at least one amenity type to load');
+                }
+            });
+            
+            // Clear amenities button
+            document.getElementById('clear-amenities-btn').addEventListener('click', function() {
+                clearAllAmenities();
+                updateAmenityCounts();
+            });
+            
+            // Amenity group headers (expand/collapse)
+            document.querySelectorAll('.amenity-header').forEach(header => {
+                header.addEventListener('click', function() {
+                    const groupId = this.getAttribute('data-group');
+                    const itemsEl = document.getElementById(groupId);
+                    itemsEl.classList.toggle('expanded');
+                });
+            });
+            
+            // Amenity checkboxes
+            document.querySelectorAll('.amenity-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    // This just handles the UI state, actual data loading happens when clicking "Load Amenities"
+                });
+            });
+        }
+
+        // Get the selected amenity types from checkboxes
+        function getSelectedAmenityTypes() {
+            const selectedTypes = [];
+            document.querySelectorAll('.amenity-checkbox:checked').forEach(checkbox => {
+                selectedTypes.push(checkbox.getAttribute('data-type'));
+            });
+            return selectedTypes;
+        }
+
+        // Load available GPX files
+        async function fetchGPXFileList() {
+            try {
+                const response = await fetch('/list_gpx_files');
+                if (!response.ok) {
+                    throw new Error(`Error fetching GPX file list: ${response.status} ${response.statusText}`);
+                }
+                
+                const fileList = await response.json();
+                
+                // Update the dropdown
+                const selectElement = document.getElementById('gpx-file-select');
+                selectElement.innerHTML = '';
+                
+                if (fileList.length === 0) {
+                    selectElement.innerHTML = '<option value="">No GPX files found</option>';
+                } else {
+                    selectElement.innerHTML = '<option value="">Select a GPX file</option>';
+                    fileList.forEach(file => {
+                        const option = document.createElement('option');
+                        option.value = file;
+                        option.textContent = file;
+                        selectElement.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error fetching GPX file list:', error);
+                alert('Error loading GPX file list. See console for details.');
+            }
+        }
+
+        // Load GPX file from server
+        async function loadGPXFromFile(filename) {
+            try {
+                const response = await fetch(`/gpx/${filename}`);
+                if (!response.ok) {
+                    throw new Error(`Error loading GPX file: ${response.status} ${response.statusText}`);
+                }
+                
+                const gpxText = await response.text();
+                return gpxText;
+            } catch (error) {
+                console.error('Error loading GPX file:', error);
+                throw error;
+            }
+        }
+
+        // Load and process GPX file
+        async function loadGPXFile(file) {
+            try {
+                showLoading('Loading GPX file...');
+                
+                // Load the GPX file
+                const gpxText = await loadGPXFromFile(file);
+                const parser = new DOMParser();
+                const gpxDoc = parser.parseFromString(gpxText, 'text/xml');
+                
+                // Process the GPX data
+                const routeData = processGPXData(gpxDoc);
+                state.routeData = routeData;
+                
+                // Display the route
+                displayRoute(routeData);
+                
+                // Update route info
+                updateRouteInfo(routeData);
+                
+                // Create segments
+                createRouteSegments(routeData);
+                
+                // Add legends
+                addLegends();
+                
+                hideLoading();
+            } catch (error) {
+                console.error('Error loading GPX file:', error);
+                alert('Error loading GPX file: ' + error.message);
+                hideLoading();
+            }
+        }
+
+        // Process GPX data into a usable format
+        function processGPXData(gpxDoc) {
+            const trackPoints = [];
+            const trackPointElements = gpxDoc.querySelectorAll('trkpt');
+            
+            let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+            let totalDistance = 0;
+            let prevPoint = null;
+            let maxElevation = -Infinity;
+            let minElevation = Infinity;
+            let totalElevationGain = 0;
+            let prevElevation = null;
+            
+            trackPointElements.forEach((trkpt, index) => {
+                const lat = parseFloat(trkpt.getAttribute('lat'));
+                const lon = parseFloat(trkpt.getAttribute('lon'));
+                const eleElement = trkpt.querySelector('ele');
+                const elevation = eleElement ? parseFloat(eleElement.textContent) : 0;
+                
+                // Get surface type from extensions if available
+                let surface = 'unknown';
+                const extensionsElement = trkpt.querySelector('extensions');
+                if (extensionsElement) {
+                    const surfaceElement = extensionsElement.querySelector('surface');
+                    if (surfaceElement) {
+                        surface = surfaceElement.textContent;
+                    }
+                }
+                
+                // Update min/max values
+                minLat = Math.min(minLat, lat);
+                maxLat = Math.max(maxLat, lat);
+                minLon = Math.min(minLon, lon);
+                maxLon = Math.max(maxLon, lon);
+                maxElevation = Math.max(maxElevation, elevation);
+                minElevation = Math.min(minElevation, elevation);
+                
+                // Calculate distance from previous point
+                let distance = 0;
+                let gradient = 0;
+                if (prevPoint) {
+                    distance = calculateDistance(
+                        prevPoint.lat, prevPoint.lon,
+                        lat, lon
+                    );
+                    totalDistance += distance;
+                    
+                    // Calculate elevation gain
+                    if (prevElevation !== null) {
+                        const elevationDiff = elevation - prevElevation;
+                        if (elevationDiff > 0) {
+                            totalElevationGain += elevationDiff;
+                        }
+                        
+                        // Calculate gradient (as percentage)
+                        if (distance > 0) {
+                            gradient = (elevationDiff / distance) * 100;
+                        }
+                    }
+                }
+                
+                trackPoints.push({
+                    lat,
+                    lon,
+                    elevation,
+                    distance: totalDistance,
+                    surface,
+                    gradient,
+                    index
+                });
+                
+                prevPoint = { lat, lon };
+                prevElevation = elevation;
+            });
+            
+            return {
+                points: trackPoints,
+                bounds: { minLat, maxLat, minLon, maxLon },
+                stats: {
+                    distance: totalDistance / 1000, // Convert to kilometers
+                    elevationGain: totalElevationGain,
+                    maxElevation,
+                    minElevation,
+                    elevationRange: maxElevation - minElevation
+                }
+            };
+        }
+
+        // Haversine formula to calculate distance between points
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371000; // Earth's radius in meters
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = 
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c; // Distance in meters
+        }
+
+        // Display the route on the map
+        function displayRoute(routeData) {
+            const points = routeData.points;
+            const latLngs = points.map(p => [p.lat, p.lon]);
+            
+            // Clear any existing route layer
+            if (state.routeLayer) {
+                map.removeLayer(state.routeLayer);
+            }
+            
+            // Create a polyline with gradient-based coloring
+            state.routeLayer = L.polyline(latLngs, {
+                color: '#3388ff',
+                weight: 4,
+                opacity: 0.7
+            }).addTo(map);
+            
+            // Set map view to fit the route
+            map.fitBounds(state.routeLayer.getBounds());
+            
+            // Colorize the route based on gradient and surface
+            colorizeRoute(routeData);
+        }
+
+        // Colorize the route based on gradient or surface type
+        function colorizeRoute(routeData, colorBy = 'gradient') {
+            const points = routeData.points;
+            
+            // Clear existing segment layers
+            state.segmentLayers.forEach(layer => map.removeLayer(layer));
+            state.segmentLayers = [];
+            
+            // Create small segments between each pair of points
+            for (let i = 0; i < points.length - 1; i++) {
+                const p1 = points[i];
+                const p2 = points[i + 1];
+                const segmentLatLngs = [[p1.lat, p1.lon], [p2.lat, p2.lon]];
+                
+                let color;
+                if (colorBy === 'gradient') {
+                    // Get color based on the gradient
+                    color = getGradientColor(p1.gradient);
+                } else {
+                    // Get color based on surface type
+                    color = getSurfaceColor(p1.surface);
+                }
+                
+                const segmentLayer = L.polyline(segmentLatLngs, {
+                    color: color,
+                    weight: 4,
+                    opacity: 0.7
+                }).addTo(map);
+                
+                // Add popup with segment info
+                segmentLayer.bindPopup(`
+                    <strong>Segment Info:</strong><br>
+                    Distance: ${p1.distance.toFixed(1)}m<br>
+                    Elevation: ${p1.elevation.toFixed(1)}m<br>
+                    Gradient: ${p1.gradient.toFixed(1)}%<br>
+                    Surface: ${p1.surface}
+                `);
+                
+                state.segmentLayers.push(segmentLayer);
+            }
+        }
+
+        // Get color based on gradient value
+        function getGradientColor(gradient) {
+            for (const { threshold, color } of gradientColors) {
+                if (gradient <= threshold) {
+                    return color;
+                }
+            }
+            return gradientColors[gradientColors.length - 1].color;
+        }
+
+        // Get color based on surface type
+        function getSurfaceColor(surface) {
+            return surfaceColors[surface] || surfaceColors.unknown;
+        }
+
+        // Update route information display
+        function updateRouteInfo(routeData) {
+            const stats = routeData.stats;
+            const points = routeData.points;
+            
+            // Count surface types
+            const surfaceCounts = {};
+            points.forEach(point => {
+                surfaceCounts[point.surface] = (surfaceCounts[point.surface] || 0) + 1;
+            });
+            
+            // Format surface distribution
+            let surfaceDistribution = '';
+            Object.entries(surfaceCounts).forEach(([surface, count]) => {
+                const percentage = ((count / points.length) * 100).toFixed(1);
+                surfaceDistribution += `${surface}: ${percentage}%<br>`;
+            });
+            
+            // Update route info element
+            document.getElementById('route-info').innerHTML = `
+                <p><strong>Distance:</strong> ${stats.distance.toFixed(1)} km</p>
+                <p><strong>Elevation Gain:</strong> ${stats.elevationGain.toFixed(0)} m</p>
+                <p><strong>Max Elevation:</strong> ${stats.maxElevation.toFixed(0)} m</p>
+                <p><strong>Min Elevation:</strong> ${stats.minElevation.toFixed(0)} m</p>
+                <p><strong>Elevation Range:</strong> ${stats.elevationRange.toFixed(0)} m</p>
+                <p><strong>Surface Distribution:</strong><br>${surfaceDistribution}</p>
+            `;
+        }
+
+        // Create route segments for analysis
+        function createRouteSegments(routeData) {
+            const points = routeData.points;
+            const totalDistance = points[points.length - 1].distance;
+            
+            // Create segments of approximately 100km each (or less for the final segment)
+            const segmentSize = 125000; // 125km in meters
+            const numSegments = Math.ceil(totalDistance / segmentSize);
+            
+            const segments = [];
+            for (let i = 0; i < numSegments; i++) {
+                const startDistance = i * segmentSize;
+                const endDistance = Math.min((i + 1) * segmentSize, totalDistance);
+                
+                // Find points that belong to this segment
+                const segmentPoints = points.filter(p => 
+                    p.distance >= startDistance && p.distance <= endDistance
+                );
+                
+                if (segmentPoints.length > 0) {
+                    segments.push({
+                        id: i + 1,
+                        startDistance: startDistance / 1000, // km
+                        endDistance: endDistance / 1000, // km
+                        points: segmentPoints
+                    });
+                }
+            }
+            
+            // Populate segments list
+            const segmentsList = document.getElementById('route-segments-list');
+            segmentsList.innerHTML = '';
+            
+            segments.forEach(segment => {
+                const li = document.createElement('li');
+                li.textContent = `Segment ${segment.id}: ${segment.startDistance.toFixed(1)} - ${segment.endDistance.toFixed(1)} km`;
+                li.dataset.segmentId = segment.id;
+                
+                li.addEventListener('click', () => {
+                    // Set as active segment
+                    document.querySelectorAll('#route-segments-list li').forEach(el => {
+                        el.classList.remove('active');
+                    });
+                    li.classList.add('active');
+                    
+                    // Update state
+                    state.currentSegment = segment;
+                    
+                    // Show segment on map
+                    showSegmentOnMap(segment);
+                    
+                    // Draw segment profile
+                    drawSegmentProfile(segment);
+                });
+                
+                segmentsList.appendChild(li);
+            });
+            
+            // Select the first segment by default
+            if (segments.length > 0) {
+                document.querySelector('#route-segments-list li').click();
+            }
+        }
+
+        // Show segment on map
+        function showSegmentOnMap(segment) {
+            // Create polyline for segment
+            const latLngs = segment.points.map(p => [p.lat, p.lon]);
+            
+            // Clear previous layers and add the new one
+            map.eachLayer(layer => {
+                if (layer instanceof L.Polyline && layer !== state.routeLayer) {
+                    map.removeLayer(layer);
+                }
+            });
+            
+            const segmentLayer = L.polyline(latLngs, {
+                color: '#ff3333',
+                weight: 6,
+                opacity: 0.8
+            }).addTo(map);
+            
+            // Fit map to segment bounds
+            map.fitBounds(segmentLayer.getBounds());
+        }
+
+        // Draw elevation and gradient profile for a segment
+        function drawSegmentProfile(segment) {
+            const profileElement = document.getElementById('segment-profile');
+            const tooltipElement = document.getElementById('tooltip');
+            
+            // Clear previous chart
+            profileElement.innerHTML = '';
+            
+            // Setup dimensions
+            const margin = { top: 10, right: 10, bottom: 30, left: 40 };
+            const width = profileElement.clientWidth - margin.left - margin.right;
+            const height = profileElement.clientHeight - margin.top - margin.bottom;
+            
+            // Create SVG
+            const svg = d3.select(profileElement)
+                .append('svg')
+                .attr('width', width + margin.left + margin.right)
+                .attr('height', height + margin.top + margin.bottom)
+                .append('g')
+                .attr('transform', `translate(${margin.left},${margin.top})`);
+            
+            // Data preparation
+            const data = segment.points;
+            
+            // Scales
+            const x = d3.scaleLinear()
+                .domain([segment.startDistance, segment.endDistance])
+                .range([0, width]);
+            
+            const elevationMin = d3.min(data, d => d.elevation);
+            const elevationMax = d3.max(data, d => d.elevation);
+            const elevationPadding = (elevationMax - elevationMin) * 0.1;
+            
+            const y = d3.scaleLinear()
+                .domain([elevationMin - elevationPadding, elevationMax + elevationPadding])
+                .range([height, 0]);
+            
+            // Line generator
+            const line = d3.line()
+                .x(d => x(d.distance / 1000))
+                .y(d => y(d.elevation))
+                .curve(d3.curveMonotoneX);
+            
+            // Add the X Axis
+            svg.append('g')
+                .attr('transform', `translate(0,${height})`)
+                .call(d3.axisBottom(x).ticks(5).tickFormat(d => `${d}km`));
+            
+            // Add the Y Axis
+            svg.append('g')
+                .call(d3.axisLeft(y).ticks(5).tickFormat(d => `${d}m`));
+            
+            // Add the elevation area
+            svg.append('path')
+                .datum(data)
+                .attr('fill', '#d1e5f0')
+                .attr('stroke', 'none')
+                .attr('d', d3.area()
+                    .x(d => x(d.distance / 1000))
+                    .y0(height)
+                    .y1(d => y(d.elevation))
+                );
+            
+            // Add the elevation line
+            svg.append('path')
+                .datum(data)
+                .attr('fill', 'none')
+                .attr('stroke', '#2c7fb8')
+                .attr('stroke-width', 2)
+                .attr('d', line);
+            
+            // Add gradient indicators
+            const gradientWidth = width / (data.length - 1);
+            svg.selectAll('rect.gradient')
+                .data(data.slice(0, data.length - 1))
+                .enter()
+                .append('rect')
+                .attr('class', 'gradient')
+                .attr('x', d => x(d.distance / 1000))
+                .attr('y', height - 5)
+                .attr('width', gradientWidth)
+                .attr('height', 5)
+                .attr('fill', d => getGradientColor(d.gradient))
+                .attr('opacity', 0.8);
+            
+            // Add tooltip interaction
+            const bisect = d3.bisector(d => d.distance).left;
+            
+            svg.append('rect')
+                .attr('width', width)
+                .attr('height', height)
+                .style('fill', 'none')
+                .style('pointer-events', 'all')
+                .on('mousemove', function(event) {
+                    const mouseX = d3.pointer(event)[0];
+                    const x0 = x.invert(mouseX) * 1000; // Convert to meters
+                    const i = bisect(data, x0);
+                    const d0 = data[i - 1];
+                    const d1 = data[i];
+                    
+                    if (!d0 || !d1) return;
+                    
+                    const d = x0 - d0.distance > d1.distance - x0 ? d1 : d0;
+                    
+                    tooltipElement.style.display = 'block';
+                    tooltipElement.style.left = `${x(d.distance / 1000) + margin.left}px`;
+                    tooltipElement.style.top = `${y(d.elevation) + margin.top - 40}px`;
+                    tooltipElement.innerHTML = `
+                        <div>Distance: ${(d.distance / 1000).toFixed(1)} km</div>
+                        <div>Elevation: ${d.elevation.toFixed(0)} m</div>
+                        <div>Gradient: ${d.gradient.toFixed(1)}%</div>
+                        <div>Surface: ${d.surface}</div>
+                    `;
+                })
+                .on('mouseout', function() {
+                    tooltipElement.style.display = 'none';
+                });
+        }
+
+        // Overpass API query functions
+        async function loadAmenities(amenityTypes) {
+            if (state.loadingAmenities) return;
+            
+            if (!state.currentSegment) {
+                alert('Please select a route segment first');
+                return;
+            }
+            
+            state.loadingAmenities = true;
+            showLoading('Loading amenities...');
+            
+            try {
+                // Generate a safe query string from amenity types
+                const amenityTypesStr = amenityTypes.join('|').replace(/\s+/g, '');
+                
+                // Get points for the current segment
+                const segmentPoints = state.currentSegment.points;
+                
+                // Simplify the segment points to reduce query size
+                // Use approximately 1 point per kilometer
+                const simplifiedPoints = [];
+                const totalDistance = segmentPoints[segmentPoints.length - 1].distance - segmentPoints[0].distance;
+                const simplifyStep = Math.max(1, Math.floor(segmentPoints.length / (totalDistance / 1000)));
+                
+                for (let i = 0; i < segmentPoints.length; i += simplifyStep) {
+                    simplifiedPoints.push(segmentPoints[i]);
+                }
+                
+                // Add the last point if it's not already included
+                if (simplifiedPoints[simplifiedPoints.length - 1] !== segmentPoints[segmentPoints.length - 1]) {
+                    simplifiedPoints.push(segmentPoints[segmentPoints.length - 1]);
+                }
+                
+                console.log(`Querying with ${simplifiedPoints.length} points out of ${segmentPoints.length} original points`);
+                
+                // Generate Overpass query parts for each point
+                const queryParts = [];
+                simplifiedPoints.forEach(point => {
+                    queryParts.push(`node(around:${state.bufferDistance},${point.lat},${point.lon})[amenity~"^(${amenityTypesStr})$"];`);
+                });
+                
+                // Build the complete Overpass query
+                const overpassQuery = `
+                [out:json][timeout:${state.overpassTimeoutSeconds}];
+                (
+                    ${queryParts.join('\n')}
+                );
+                out body;
+                `;
+                
+                console.log('Overpass query:', overpassQuery);
+                
+                // Execute query using the Overpass API
+                const amenities = await queryOverpassAPI(overpassQuery);
+                
+                // Process and display the amenities
+                processAmenities(amenities, amenityTypes);
+                
+                hideLoading();
+                state.loadingAmenities = false;
+            } catch (error) {
+                console.error('Error loading amenities:', error);
+                alert(`Error loading amenities: ${error.message}`);
+                hideLoading();
+                state.loadingAmenities = false;
+            }
+        }
+
+        // Query the Overpass API
+        async function queryOverpassAPI(query) {
+            const overpassUrl = 'https://overpass-api.de/api/interpreter';
+            
+            try {
+                const response = await fetch(overpassUrl, {
+                    method: 'POST',
+                    body: new URLSearchParams({ data: query }),
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Overpass API returned ${response.status} ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                return data.elements;
+            } catch (error) {
+                console.error('Overpass API error:', error);
+                throw error;
+            }
+        }
+
+        // Process and display amenities on the map
+        function processAmenities(amenities, selectedTypes) {
+            console.log(`Processing ${amenities.length} amenities`);
+            
+            // Reset counts
+            state.amenityCounts = {};
+            
+            // Group amenities by type
+            const amenitiesByType = {};
+            
+            amenities.forEach(amenity => {
+                if (amenity.type !== 'node') return;
+                
+                const amenityType = amenity.tags?.amenity;
+                if (!amenityType) return;
+                
+                // Check if this amenity type is in our selected types
+                const isSelected = selectedTypes.some(typeStr => {
+                    // Handle the case of compound types like "drinking_water|water_point"
+                    const types = typeStr.split('|');
+                    return types.includes(amenityType);
+                });
+                
+                if (!isSelected) return;
+                
+                // Initialize array for this type if it doesn't exist
+                if (!amenitiesByType[amenityType]) {
+                    amenitiesByType[amenityType] = [];
+                }
+                
+                // Add to the array, avoiding duplicates
+                const exists = amenitiesByType[amenityType].some(a => a.id === amenity.id);
+                if (!exists) {
+                    amenitiesByType[amenityType].push(amenity);
+                }
+            });
+            
+            // Clear existing amenity layers if they exist but aren't in the selected types
+            Object.keys(state.amenityLayers).forEach(type => {
+                if (!amenitiesByType[type]) {
+                    if (state.amenityLayers[type]) {
+                        map.removeLayer(state.amenityLayers[type]);
+                        delete state.amenityLayers[type];
+                    }
+                }
+            });
+            
+            // Add new amenity layers
+            Object.entries(amenitiesByType).forEach(([type, typeAmenities]) => {
+                // Remove existing layer if it exists
+                if (state.amenityLayers[type]) {
+                    map.removeLayer(state.amenityLayers[type]);
+                }
+                
+                // Find the icon and color for this amenity type
+                let icon, color;
+                for (const [groupName, group] of Object.entries(amenityGroups)) {
+                    for (const [groupType, config] of Object.entries(group)) {
+                        // Handle compound types
+                        const groupTypes = groupType.split('|');
+                        if (groupTypes.includes(type)) {
+                            icon = config.icon;
+                            color = config.color;
+                            
+                            // Update count for this group
+                            state.amenityCounts[groupName] = (state.amenityCounts[groupName] || 0) + typeAmenities.length;
+                            break;
+                        }
+                    }
+                    if (icon) break;
+                }
+                
+                // Default icon/color if not found
+                if (!icon) {
+                    icon = 'fa-map-marker-alt';
+                    color = '#3388ff';
+                }
+                
+                // Create layer group for this amenity type
+                const markers = [];
+                
+                typeAmenities.forEach(amenity => {
+                    const customIcon = L.divIcon({
+                        html: `<i class="fas ${icon}" style="color: ${color};"></i>`,
+                        className: 'amenity-marker',
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 24]
+                    });
+                    
+                    const marker = L.marker([amenity.lat, amenity.lon], {
+                        icon: customIcon
+                    });
+                    
+                    const name = amenity.tags.name || type;
+                    marker.bindPopup(`
+                        <strong>${name}</strong><br>
+                        Type: ${type}<br>
+                        ${amenity.tags.website ? `<a href="${amenity.tags.website}" target="_blank">Website</a><br>` : ''}
+                        ${amenity.tags.phone ? `Phone: ${amenity.tags.phone}<br>` : ''}
+                        ${amenity.tags.opening_hours ? `Hours: ${amenity.tags.opening_hours}` : ''}
+                    `);
+                    
+                    markers.push(marker);
+                });
+                
+                // Create a feature group for all markers of this type
+                state.amenityLayers[type] = L.featureGroup(markers).addTo(map);
+            });
+            
+            // Update the amenity counts in the UI
+            updateAmenityCounts();
+        }
+
+        // Update amenity counts in the UI
+        function updateAmenityCounts() {
+            // Reset all count displays
+            document.querySelectorAll('.amenity-count').forEach(el => {
+                el.textContent = '0';
+            });
+            
+            // Update counts for each group
+            Object.entries(state.amenityCounts).forEach(([groupName, count]) => {
+                const countEl = document.getElementById(`count-${groupName}`);
+                if (countEl) {
+                    countEl.textContent = count;
+                }
+            });
+        }
+
+        // Clear all amenity layers
+        function clearAllAmenities() {
+            Object.values(state.amenityLayers).forEach(layer => {
+                map.removeLayer(layer);
+            });
+            state.amenityLayers = {};
+        }
+
+        // Show loading indicator
+        function showLoading(message) {
+            const loadingEl = document.getElementById('loading');
+            const loadingTextEl = loadingEl.querySelector('.loading-text');
+            loadingTextEl.textContent = message || 'Loading...';
+            loadingEl.style.display = 'block';
+        }
+
+        // Hide loading indicator
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        // Initialize the application
+        function init() {
+            // Set up event listeners
+            initEventListeners();
+            
+            // Load available GPX files
+            fetchGPXFileList();
+        }
+
+        // Start the application when the page is loaded
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
